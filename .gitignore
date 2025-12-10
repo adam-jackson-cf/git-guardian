@@ -33,9 +33,8 @@ ENV/
 *.swo
 *~
 
-# Guardian
-.guardian/reports/
-.guardian/baseline.json
+# Guardian (project-specific, created by `guardian init`)
+.guardian/
 
 # Testing
 .pytest_cache/
