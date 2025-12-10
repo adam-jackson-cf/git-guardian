@@ -1,0 +1,34 @@
+# Copilot Instructions
+
+## Git Push Command Restrictions
+
+NEVER execute these commands:
+- git push (any variant)
+- git push --force
+- git push --no-verify
+
+ALWAYS use guardian push for pushing code remote:
+- guardian push [remote] [branch]
+
+## VS Code Settings
+
+Guardian has configured your VS Code settings (`.vscode/settings.json`) with:
+- **denyList**: Blocks `git push`, `git push --force`, `git push --no-verify`
+- **allowList**: Allows `guardian push`, `git add`, `git commit`, `git status`
+
+> **Important**: If `github.copilot.chat.agent.terminal.autoApprove` is enabled, the denyList is ignored. Keep auto-approve disabled for Guardian to work properly.
+
+## Copilot CLI Usage
+
+When launching Copilot CLI, use these flags to deny git push:
+```bash
+copilot --deny-tool 'shell(git push)' --deny-tool 'shell(git push --force)'
+```
+
+## On Push Failure
+
+When guardian push fails:
+1. Note the report path in the output
+2. Read the report file
+3. Address each violation
+4. Retry guardian push once you have committed local changes

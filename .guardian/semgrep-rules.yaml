@@ -1,0 +1,61 @@
+rules:
+  # TypeScript stub implementations
+  - id: ts-throw-not-implemented
+    patterns:
+      - pattern: throw new Error("not implemented")
+      - pattern: throw new Error("Not implemented")
+      - pattern: throw new Error("TODO")
+    message: "Stub implementation detected - throw Error('not implemented')"
+    severity: ERROR
+    languages: [typescript, javascript]
+
+  - id: ts-throw-unimplemented
+    pattern: throw new Error($MSG)
+    metavariable-regex:
+      metavariable: $MSG
+      regex: '(?i).*(not\s+implemented|todo|fixme|stub).*'
+    message: "Stub implementation with Error throw"
+    severity: ERROR
+    languages: [typescript, javascript]
+
+  # Python stub implementations (outside abstract methods)
+  - id: py-raise-not-implemented
+    pattern: raise NotImplementedError(...)
+    message: "NotImplementedError - ensure this is in an abstract method"
+    severity: WARNING
+    languages: [python]
+
+  - id: py-pass-only-body
+    pattern: |
+      def $FUNC(...):
+          pass
+    message: "Function body is only 'pass' - potential stub"
+    severity: WARNING
+    languages: [python]
+
+  - id: py-ellipsis-body
+    pattern: |
+      def $FUNC(...):
+          ...
+    message: "Function body is only '...' - potential stub"
+    severity: WARNING
+    languages: [python]
+
+  # Test skips (both languages)
+  - id: pytest-skip-decorator
+    pattern: '@pytest.mark.skip(...)'
+    message: "Skipped pytest test"
+    severity: ERROR
+    languages: [python]
+
+  - id: pytest-skip-call
+    pattern: pytest.skip(...)
+    message: "Programmatic test skip"
+    severity: ERROR
+    languages: [python]
+
+  - id: unittest-skip
+    pattern: '@unittest.skip(...)'
+    message: "Skipped unittest"
+    severity: ERROR
+    languages: [python]

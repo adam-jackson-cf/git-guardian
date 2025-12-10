@@ -1,0 +1,13 @@
+# Guardian policy - blocks git push commands
+[[rule]]
+pattern = ["git", "push"]
+decision = "forbidden"
+match = ["git push", "git push origin main", "git push --force"]
+
+[[rule]]
+pattern = ["git", "push", "--no-verify"]
+decision = "forbidden"
+
+[[rule]]
+pattern = ["git", "push", "--force"]
+decision = "forbidden"

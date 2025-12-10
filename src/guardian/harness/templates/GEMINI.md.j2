@@ -1,0 +1,19 @@
+# GEMINI.md
+
+## Git Push Command Restrictions
+
+NEVER execute these commands:
+- git push (any variant)
+- git push --force
+- git push --no-verify
+
+ALWAYS use guardian push for pushing code remote:
+- guardian push [remote] [branch]
+
+## On Push Failure
+
+When guardian push fails:
+1. Note the report path in the output
+2. Read the report file
+3. Address each violation
+4. Retry guardian push once you have committed local changes

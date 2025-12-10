@@ -1,0 +1,16 @@
+[lint]
+select = [
+    "RUF100",   # Unused noqa directive (detects noqa without effect)
+    "PGH003",   # Use specific rule codes with type: ignore
+    "PGH004",   # Use specific codes with noqa
+    "ERA001",   # Found commented-out code
+    "FIX001",   # Line contains FIXME
+    "FIX002",   # Line contains TODO
+    "FIX003",   # Line contains XXX
+    "FIX004",   # Line contains HACK
+    "T201",     # print found
+    "T203",     # pprint found
+]
+
+# Note: ignore-noqa is a command-line flag, not a config option
+# Run with: ruff check --no-cache --ignore-noqa

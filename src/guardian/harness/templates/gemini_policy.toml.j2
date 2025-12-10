@@ -1,0 +1,20 @@
+# Guardian policy - blocks git push commands
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git push"
+decision = "deny"
+priority = 500
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "git\\s+push"
+decision = "deny"
+priority = 500
+
+# Allow guardian push
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "guardian push"
+decision = "allow"
+priority = 600
