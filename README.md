@@ -93,6 +93,9 @@ guardian verify
 
 # Push with verification (blocks push if violations found)
 guardian push origin main
+
+# JSON output for CI/automation
+guardian verify --json
 ```
 
 ## What Guardian Does
@@ -102,6 +105,7 @@ Guardian prevents AI code assistants from bypassing quality gates by:
 - **Blocking `git push`** - LLM tools are configured to deny direct `git push` commands
 - **Requiring `guardian push`** - The only way for LLMs to push code is through Guardian's verification
 - **Running quality checks** - ESLint, Ruff, Semgrep, and coverage analysis before allowing pushes
+- **Failing closed on setup/tool errors** - Missing compare branches, invalid baselines, and tool execution failures are reported as violations
 - **Generating reports** - Actionable Markdown reports for fixing violations
 
 ## Supported LLM Tools

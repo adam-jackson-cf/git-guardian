@@ -21,15 +21,34 @@ def check_config_drift() -> list[Violation]:
     baseline_file = guardian_dir / "baseline.json"
 
     if not baseline_file.exists():
-        # No baseline, skip check
-        return []
+        return [
+            Violation(
+                file=str(baseline_file),
+                line=0,
+                column=0,
+                rule="config-baseline-missing",
+                message="Config baseline file is missing.",
+                severity="error",
+                suggestion="Run `guardian baseline update` to create baseline hashes.",
+            )
+        ]
 
     violations = []
 
     try:
         baseline = json.loads(baseline_file.read_text())
     except (json.JSONDecodeError, FileNotFoundError):
-        baseline = {}
+        return [
+            Violation(
+                file=str(baseline_file),
+                line=0,
+                column=0,
+                rule="config-baseline-invalid",
+                message="Config baseline file is invalid JSON.",
+                severity="error",
+                suggestion="Run `guardian baseline update` to regenerate a valid baseline.",
+            )
+        ]
 
     for config_file in PROTECTED_CONFIGS:
         config_path = repo_root / config_file
@@ -38,7 +57,21 @@ def check_config_drift() -> list[Violation]:
 
         current_hash = hashlib.sha256(config_path.read_bytes()).hexdigest()
 
-        if config_file in baseline and baseline[config_file] != current_hash:
+        if config_file not in baseline:
+            violations.append(
+                Violation(
+                    file=config_file,
+                    line=0,
+                    column=0,
+                    rule="config-baseline-incomplete",
+                    message=f"Config file missing from baseline: {config_file}",
+                    severity="error",
+                    suggestion="Run `guardian baseline update` to capture all protected configs.",
+                )
+            )
+            continue
+
+        if baseline[config_file] != current_hash:
             violations.append(
                 Violation(
                     file=config_file,

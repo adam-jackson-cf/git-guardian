@@ -1,5 +1,6 @@
 """Initialize Guardian in a repository."""
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -72,8 +73,7 @@ harness:
     # Create baseline.json if it doesn't exist
     baseline_file = guardian_dir / "baseline.json"
     if not baseline_file.exists():
-        baseline_file.write_text("""{}
-""")
+        baseline_file.write_text("{}\n")
         console.print(f"[green]✓ Created {baseline_file}[/green]")
 
     # Copy analysis config files from templates
@@ -92,10 +92,22 @@ harness:
                 target_file.write_text(template_file.read_text())
                 console.print(f"[green]✓ Created {target_file}[/green]")
 
+    # Initialize baseline hashes from current protected config files.
+    from guardian.cli.baseline import generate_baseline_data
+
+    baseline_data, included_files = generate_baseline_data(repo_root)
+    baseline_file.write_text(json.dumps(baseline_data, indent=2) + "\n")
+    if included_files:
+        console.print(
+            f"[green]✓ Recorded baseline hashes for {len(included_files)} config file(s)[/green]"
+        )
+    else:
+        console.print("[yellow]No protected config files found for baseline yet[/yellow]")
+
     console.print(f"\n[green]✓ Guardian initialized in {repo_root}[/green]")
     console.print("\n[yellow]Next steps:[/yellow]")
     console.print(
-        "  1. Install harness configurations: " "[cyan]guardian harness install --all[/cyan]"
+        "  1. Install harness configurations: [cyan]guardian harness install --all[/cyan]"
     )
     console.print("  2. Run verification: [cyan]guardian verify[/cyan]")
 

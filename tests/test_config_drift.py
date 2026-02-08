@@ -10,9 +10,11 @@ def test_config_drift_no_baseline(temp_dir, monkeypatch):
     """Test config drift with no baseline file."""
     monkeypatch.chdir(temp_dir)
 
-    # No baseline file, should return empty list
+    # No baseline file must fail closed.
     violations = check_config_drift()
-    assert violations == []
+    assert len(violations) == 1
+    assert violations[0].rule == "config-baseline-missing"
+    assert violations[0].severity == "error"
 
 
 def test_config_drift_no_changes(temp_dir, monkeypatch):
