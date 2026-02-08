@@ -39,7 +39,7 @@ git-guardian/
 ├── .guardian/                 # Guardian config (created by init)
 ├── install.sh                 # Curl-installable installer script
 ├── pyproject.toml             # Project configuration
-└── docs/reference/guardian-technical-specification-v0.3.1.md  # Full technical spec
+└── docs/reference/guardian-technical-spec.md  # Full technical spec
 ```
 
 ### Key Files

@@ -115,7 +115,7 @@ guardian harness status
 
 ## Documentation
 
-See [docs/reference/guardian-technical-specification-v0.3.1.md](docs/reference/guardian-technical-specification-v0.3.1.md) for full technical specification.
+See [docs/reference/guardian-technical-spec.md](docs/reference/guardian-technical-spec.md) for full technical specification.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution workflow.
 
 ## License
