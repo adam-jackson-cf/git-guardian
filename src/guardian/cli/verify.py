@@ -13,7 +13,7 @@ app = typer.Typer(name="verify", help="Run verification without pushing")
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def verify(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:

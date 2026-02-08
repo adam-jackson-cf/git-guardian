@@ -13,7 +13,7 @@ app = typer.Typer(name="push", help="Verify code quality and push to remote")
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def push(
     remote: str = typer.Argument("origin", help="Git remote name"),
     branch: str = typer.Argument(None, help="Branch to push (default: current)"),

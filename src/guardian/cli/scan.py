@@ -13,7 +13,7 @@ app = typer.Typer(name="scan", help="Full codebase audit")
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def scan(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:

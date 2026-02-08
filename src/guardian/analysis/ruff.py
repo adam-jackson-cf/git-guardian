@@ -13,8 +13,17 @@ def run_ruff(files: list[str]) -> list[Violation]:
     config_file = repo_root / ".guardian" / "ruff.toml"
 
     if not config_file.exists():
-        # No Ruff config, skip
-        return []
+        return [
+            Violation(
+                file=str(config_file),
+                line=0,
+                column=0,
+                rule="ruff-config-missing",
+                message="Ruff config file is missing.",
+                severity="error",
+                suggestion="Run `guardian init` to restore .guardian/ruff.toml.",
+            )
+        ]
 
     violations = []
 
@@ -30,12 +39,25 @@ def run_ruff(files: list[str]) -> list[Violation]:
         *files,
     ]
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+    except OSError as exc:
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="ruff-execution",
+                message=f"Failed to execute Ruff: {exc}",
+                severity="error",
+                suggestion="Ensure `ruff` is installed and available in PATH.",
+            )
+        ]
 
     # Ruff returns non-zero on errors, but we still parse output
     try:
@@ -51,8 +73,17 @@ def run_ruff(files: list[str]) -> list[Violation]:
                     severity="error",
                 )
             )
-    except (json.JSONDecodeError, KeyError):
-        # If parsing fails, Ruff might not be installed or config is invalid
-        pass
+    except (json.JSONDecodeError, KeyError) as exc:
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="ruff-output-parse",
+                message=f"Failed to parse Ruff output: {exc}",
+                severity="error",
+                suggestion="Fix Ruff configuration or runtime errors and retry.",
+            )
+        ]
 
     return violations

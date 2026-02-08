@@ -16,10 +16,21 @@ def run_verification() -> list[Violation]:
     violations = []
 
     # 1. Get changed files
-    changed_files = get_changed_files()
+    changed_file_result = get_changed_files()
+    if changed_file_result.error:
+        return [
+            Violation(
+                file=".guardian/config.yaml",
+                line=0,
+                column=0,
+                rule="git-compare-branch",
+                message=changed_file_result.error,
+                severity="error",
+                suggestion="Fix compare_branch or fetch the configured branch before verifying.",
+            )
+        ]
 
-    if not changed_files:
-        return []
+    changed_files = changed_file_result.files
 
     ts_files = [f for f in changed_files if f.endswith((".ts", ".tsx", ".js", ".jsx"))]
     py_files = [f for f in changed_files if f.endswith(".py")]
@@ -40,7 +51,7 @@ def run_verification() -> list[Violation]:
     if coverage_file.exists():
         violations.extend(run_diff_cover(coverage_file))
 
-    # 6. Check config drift
+    # 6. Check config drift (always enforced, even with no code changes)
     violations.extend(check_config_drift())
 
     return violations
@@ -51,10 +62,21 @@ def run_full_scan() -> list[Violation]:
     violations = []
 
     # 1. Get all files
-    all_files = get_all_files()
+    all_file_result = get_all_files()
+    if all_file_result.error:
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="git-file-discovery",
+                message=all_file_result.error,
+                severity="error",
+                suggestion="Resolve git file discovery errors and rerun scan.",
+            )
+        ]
 
-    if not all_files:
-        return []
+    all_files = all_file_result.files
 
     ts_files = [f for f in all_files if f.endswith((".ts", ".tsx", ".js", ".jsx"))]
     py_files = [f for f in all_files if f.endswith(".py")]

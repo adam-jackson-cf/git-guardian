@@ -1,10 +1,19 @@
 """Git utilities for file detection."""
 
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 
-def get_changed_files() -> list[str]:
+@dataclass
+class FileDiscoveryResult:
+    """Result of attempting to discover repository files."""
+
+    files: list[str]
+    error: str | None = None
+
+
+def get_changed_files() -> FileDiscoveryResult:
     """Get files changed since origin/main."""
     repo_root = Path.cwd()
 
@@ -18,44 +27,67 @@ def get_changed_files() -> list[str]:
         config = yaml.safe_load(config_file.read_text())
         compare_branch = config.get("analysis", {}).get("compare_branch", "origin/main")
 
-    # Check if branch exists
-    result = subprocess.run(
-        ["git", "rev-parse", "--verify", compare_branch],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", compare_branch],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return FileDiscoveryResult(
+            files=[],
+            error=f"Failed to verify compare branch '{compare_branch}': {exc}",
+        )
 
     if result.returncode != 0:
-        # Branch doesn't exist, return empty list
-        return []
+        return FileDiscoveryResult(
+            files=[],
+            error=(
+                f"Compare branch '{compare_branch}' is not available. "
+                "Set analysis.compare_branch to a valid ref."
+            ),
+        )
 
-    result = subprocess.run(
-        ["git", "diff", "--name-only", f"{compare_branch}...HEAD"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", f"{compare_branch}...HEAD"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return FileDiscoveryResult(
+            files=[],
+            error=f"Failed to diff against compare branch '{compare_branch}': {exc}",
+        )
 
     if result.returncode != 0:
-        return []
+        return FileDiscoveryResult(
+            files=[],
+            error=(
+                f"Git diff failed for compare branch '{compare_branch}'. "
+                "Fix repository state and retry."
+            ),
+        )
 
     files = [f for f in result.stdout.strip().split("\n") if f]
-    # Filter to only files that exist
-    return [f for f in files if (repo_root / f).exists()]
+    return FileDiscoveryResult(files=[f for f in files if (repo_root / f).exists()])
 
 
-def get_all_files() -> list[str]:
+def get_all_files() -> FileDiscoveryResult:
     """Get all tracked files in the repository."""
     repo_root = Path.cwd()
 
-    result = subprocess.run(
-        ["git", "ls-files"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return FileDiscoveryResult(files=[], error=f"Failed to list repository files: {exc}")
 
     if result.returncode != 0:
-        return []
+        return FileDiscoveryResult(files=[], error="git ls-files failed in current repository.")
 
     files = [f for f in result.stdout.strip().split("\n") if f]
-    # Filter to only files that exist
-    return [f for f in files if (repo_root / f).exists()]
+    return FileDiscoveryResult(files=[f for f in files if (repo_root / f).exists()])

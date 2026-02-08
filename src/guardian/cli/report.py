@@ -9,7 +9,7 @@ app = typer.Typer(name="report", help="View latest report")
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def report(
     path: str = typer.Option(None, "--path", help="Path to specific report file"),
 ) -> None:

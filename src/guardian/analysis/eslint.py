@@ -13,8 +13,17 @@ def run_eslint(files: list[str]) -> list[Violation]:
     config_file = repo_root / ".guardian" / "eslint.config.js"
 
     if not config_file.exists():
-        # No ESLint config, skip
-        return []
+        return [
+            Violation(
+                file=str(config_file),
+                line=0,
+                column=0,
+                rule="eslint-config-missing",
+                message="ESLint config file is missing.",
+                severity="error",
+                suggestion="Run `guardian init` to restore .guardian/eslint.config.js.",
+            )
+        ]
 
     violations = []
 
@@ -29,12 +38,25 @@ def run_eslint(files: list[str]) -> list[Violation]:
         *files,
     ]
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+    except OSError as exc:
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="eslint-execution",
+                message=f"Failed to execute ESLint: {exc}",
+                severity="error",
+                suggestion="Ensure `npx eslint` is installed and available in PATH.",
+            )
+        ]
 
     # ESLint returns non-zero on errors, but we still parse output
     try:
@@ -51,8 +73,17 @@ def run_eslint(files: list[str]) -> list[Violation]:
                         severity="error" if msg.get("severity") == 2 else "warning",
                     )
                 )
-    except (json.JSONDecodeError, KeyError):
-        # If parsing fails, ESLint might not be installed or config is invalid
-        pass
+    except (json.JSONDecodeError, KeyError) as exc:
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="eslint-output-parse",
+                message=f"Failed to parse ESLint output: {exc}",
+                severity="error",
+                suggestion="Fix ESLint configuration or runtime errors and retry.",
+            )
+        ]
 
     return violations
