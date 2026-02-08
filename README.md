@@ -6,23 +6,23 @@ Guardian is a verification system designed to detect and prevent quality gate by
 
 - **Python 3.11+** - Guardian requires Python 3.11 or higher
 - **Git** - Must be in a git repository to use Guardian
-- **uv** (recommended) or **pip** - For installing from source
+- **uv** - Required for installation and command execution
 
 ## Installation
 
-### Option 0: Quick Install (curl)
+### Option 0: Quick Install (local script)
 
-The fastest way to install Guardian is using our installer script:
+Run the installer script directly from the repository:
 
 ```bash
 # Basic installation (interactive)
-curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash
+bash install.sh
 
 # Easy mode (auto-install everything without prompts)
-curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash -s -- --easy-mode
+bash install.sh --easy-mode
 
 # Dry run (preview what would be installed)
-curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash -s -- --dry-run
+bash install.sh --dry-run
 ```
 
 **Installation Options:**
@@ -38,38 +38,20 @@ curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/insta
 | `--uninstall` | Uninstall git-guardian and remove configurations |
 | `--help` | Show full help message |
 
-**Security Note:** For security, you can review the script before executing:
+**Security Note:** Review the script before executing:
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh" -o install.sh
 cat install.sh  # Review the script
 bash install.sh
 ```
 
-### Option 1: Install from Source (Recommended for Development)
+### Option 1: Install from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/git-guardian.git
-cd git-guardian
-
-# Install using uv (recommended)
+# From the repository root, install using uv
 uv sync
 uv pip install -e .
-
-# Or install using pip
-pip install -e .
 ```
-
-### Option 2: Install via pipx (When Published)
-
-Once Guardian is published to PyPI, you can install it globally:
-
-```bash
-pipx install git-guardian
-```
-
-> **Note**: Guardian is not yet published to PyPI. Use Option 0 or Option 1 for now.
 
 ## Quick Start
 
@@ -130,28 +112,8 @@ guardian harness status
 
 ## Documentation
 
-See [guardian-technical-specification-v0.3.1.md](guardian-technical-specification-v0.3.1.md) for full technical specification.
-
-## Development
-
-To contribute to Guardian:
-
-```bash
-# Clone and navigate to repository
-git clone https://github.com/your-org/git-guardian.git
-cd git-guardian
-
-# Install development dependencies
-uv sync --dev
-
-# Run quality gates
-uv run ruff check .
-uv run mypy src/ --ignore-missing-imports
-uv run pytest
-
-# Run Guardian on itself
-uv run guardian verify
-```
+See [docs/reference/guardian-technical-specification-v0.3.1.md](docs/reference/guardian-technical-specification-v0.3.1.md) for full technical specification.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution workflow.
 
 ## License
 

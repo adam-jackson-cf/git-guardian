@@ -19,7 +19,7 @@ Guardian is an AI code verification system designed to detect and prevent qualit
 - CLI Framework: Typer with Rich for console output
 - Templating: Jinja2 for harness configuration generation
 - Git Integration: GitPython
-- Package Manager: uv (recommended) or pip
+- Package Manager: uv
 - Build System: Hatchling
 - Linter: Ruff
 - Type Checker: mypy (strict mode)
@@ -39,7 +39,7 @@ git-guardian/
 ├── .guardian/                 # Guardian config (created by init)
 ├── install.sh                 # Curl-installable installer script
 ├── pyproject.toml             # Project configuration
-└── guardian-technical-specification-v0.3.1.md  # Full technical spec
+└── docs/reference/guardian-technical-specification-v0.3.1.md  # Full technical spec
 ```
 
 ### Key Files
