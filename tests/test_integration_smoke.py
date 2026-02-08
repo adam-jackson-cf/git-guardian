@@ -1,5 +1,6 @@
 """Integration smoke tests for end-to-end Guardian CLI verification behavior."""
 
+import json
 import os
 import stat
 import subprocess
@@ -81,8 +82,15 @@ def test_compare_branch_missing(temp_dir, monkeypatch):
     result = runner.invoke(app, ["verify", "--json"], env=env)
 
     assert result.exit_code == 1
-    assert '"status": "failed"' in result.stdout
-    assert "git-compare-branch" in result.stdout
+    json_start = result.stdout.find("{")
+    output = json.loads(result.stdout[json_start:])
+    assert output["status"] == "failed"
+    assert output["violation_count"] == 1
+    assert output["violations"][0]["rule"] == "git-compare-branch"
+    assert output["violations"][0]["severity"] == "error"
+    assert output["violations"][0]["suggestion"] == (
+        "Fix compare_branch or fetch the configured branch before verifying."
+    )
 
 
 def test_tool_failure(temp_dir, monkeypatch):

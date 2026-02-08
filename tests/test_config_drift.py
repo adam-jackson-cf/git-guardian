@@ -61,4 +61,4 @@ def test_config_drift_with_changes(temp_dir, monkeypatch):
     assert len(violations) == 1
     assert violations[0].file == "tsconfig.json"
     assert violations[0].rule == "config-drift"
-    assert violations[0].severity == "warning"
+    assert violations[0].severity == "error"

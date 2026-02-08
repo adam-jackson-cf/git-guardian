@@ -79,7 +79,7 @@ def check_config_drift() -> list[Violation]:
                     column=0,
                     rule="config-drift",
                     message=f"Config file modified: {config_file}",
-                    severity="warning",
+                    severity="error",
                     suggestion="Review config changes - quality gates may be weakened",
                 )
             )

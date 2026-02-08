@@ -17,7 +17,6 @@ console = Console()
 def push(
     remote: str = typer.Argument("origin", help="Git remote name"),
     branch: str = typer.Argument(None, help="Branch to push (default: current)"),
-    force: bool = typer.Option(False, "--force", "-f", help="Force push"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Verify without pushing"),
 ) -> None:
     """Verify code quality and push to remote."""
@@ -57,8 +56,6 @@ def push(
 
     # Execute git push
     push_cmd = ["git", "push"]
-    if force:
-        push_cmd.append("--force")
     push_cmd.extend([remote, branch])
 
     console.print(f"\n[blue]Pushing to {remote}/{branch}...[/blue]")
