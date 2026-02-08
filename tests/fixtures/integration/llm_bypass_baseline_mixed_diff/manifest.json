@@ -1,0 +1,8 @@
+{
+  "description": "LLM attempt to update baseline in same diff as app code should fail.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["baseline-change-mixed-diff"]
+  }
+}

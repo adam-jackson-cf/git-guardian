@@ -6,6 +6,7 @@ from rich.table import Table
 
 from guardian.harness.installer import (
     SUPPORTED_HARNESSES,
+    HarnessStatus,
     install_harness,
     list_installed_harnesses,
 )
@@ -22,12 +23,16 @@ def install(
     """Install harness configuration for specific tool or all tools."""
 
     if all_harnesses:
+        failures: list[str] = []
         for name in SUPPORTED_HARNESSES:
             try:
                 install_harness(name)
                 console.print(f"[green]✓ Installed {name}[/green]")
             except Exception as e:
                 console.print(f"[red]✗ Failed to install {name}: {e}[/red]")
+                failures.append(name)
+        if failures:
+            raise typer.Exit(1)
     elif harness_name:
         if harness_name not in SUPPORTED_HARNESSES:
             console.print(f"[red]Error: Unknown harness '{harness_name}'[/red]")
@@ -49,17 +54,32 @@ def install(
 def status() -> None:
     """Check status of installed harness configurations."""
 
-    installed = list_installed_harnesses()
+    statuses = list_installed_harnesses()
 
     table = Table(title="Harness Status")
     table.add_column("Harness", style="cyan")
     table.add_column("Status", style="green")
     table.add_column("Files", style="yellow")
+    table.add_column("Issues", style="red")
 
     for name in SUPPORTED_HARNESSES:
-        status_text = "Installed" if name in installed else "Not installed"
-        files = installed.get(name, [])
-        files_text = ", ".join(files) if files else "-"
-        table.add_row(name, status_text, files_text)
+        harness_status = statuses.get(
+            name,
+            HarnessStatus(installed=False, files=(), missing_files=(), issues=("No status data.",)),
+        )
+
+        if harness_status.installed:
+            status_text = "Installed"
+        elif harness_status.files or harness_status.issues or harness_status.missing_files:
+            status_text = "Incomplete"
+        else:
+            status_text = "Not installed"
+
+        files_text = ", ".join(harness_status.files) if harness_status.files else "-"
+        issues: list[str] = []
+        issues.extend(f"Missing: {item}" for item in harness_status.missing_files)
+        issues.extend(harness_status.issues)
+        issues_text = "; ".join(issues) if issues else "-"
+        table.add_row(name, status_text, files_text, issues_text)
 
     console.print(table)

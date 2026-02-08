@@ -1,0 +1,8 @@
+{
+  "description": "Tampering with protected Guardian policy config must be detected.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["config-drift"]
+  }
+}

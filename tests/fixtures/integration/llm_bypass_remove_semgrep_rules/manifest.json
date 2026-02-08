@@ -1,0 +1,11 @@
+{
+  "description": "Removing Semgrep rules to bypass checks must fail closed.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["semgrep-rules-missing"]
+  },
+  "repo": {
+    "head_delete": [".guardian/semgrep-rules.yaml"]
+  }
+}

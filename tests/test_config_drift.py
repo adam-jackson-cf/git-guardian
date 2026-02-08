@@ -62,3 +62,43 @@ def test_config_drift_with_changes(temp_dir, monkeypatch):
     assert violations[0].file == "tsconfig.json"
     assert violations[0].rule == "config-drift"
     assert violations[0].severity == "error"
+
+
+def test_baseline_change_requires_metadata(temp_dir, monkeypatch):
+    """Baseline hash edits without metadata must fail."""
+    monkeypatch.chdir(temp_dir)
+
+    guardian_dir = temp_dir / ".guardian"
+    guardian_dir.mkdir()
+    (guardian_dir / "baseline.json").write_text("{}\n")
+
+    violations = check_config_drift(changed_files=[".guardian/baseline.json"])
+    rules = {violation.rule for violation in violations}
+
+    assert "baseline-meta-required" in rules
+    assert "baseline-meta-missing" in rules
+
+
+def test_baseline_change_mixed_with_code_is_blocked(temp_dir, monkeypatch):
+    """Baseline updates must be isolated from non-policy file changes."""
+    monkeypatch.chdir(temp_dir)
+
+    guardian_dir = temp_dir / ".guardian"
+    guardian_dir.mkdir()
+    (guardian_dir / "baseline.json").write_text("{}\n")
+    (guardian_dir / "baseline.meta.json").write_text(
+        json.dumps(
+            {
+                "acknowledged_policy_change": True,
+                "reason": "Policy baseline update",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+    )
+
+    violations = check_config_drift(
+        changed_files=[".guardian/baseline.json", ".guardian/baseline.meta.json", "app.py"]
+    )
+    rules = {violation.rule for violation in violations}
+
+    assert "baseline-change-mixed-diff" in rules

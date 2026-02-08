@@ -1,0 +1,11 @@
+{
+  "description": "LLM baseline tamper without metadata acknowledgement should be blocked.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["baseline-meta-required"]
+  },
+  "repo": {
+    "auto_change_app": false
+  }
+}

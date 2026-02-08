@@ -1,13 +1,16 @@
 """Semgrep runner for custom pattern detection."""
 
+from __future__ import annotations
+
 import json
 import subprocess
 from pathlib import Path
 
 from guardian.analysis.violation import Violation
+from guardian.configuration import ConfigValidationError, split_command
 
 
-def run_semgrep(files: list[str]) -> list[Violation]:
+def run_semgrep(files: list[str], *, tool_command: str) -> list[Violation]:
     """Run Semgrep with Guardian rules."""
     repo_root = Path.cwd()
     rules_file = repo_root / ".guardian" / "semgrep-rules.yaml"
@@ -25,16 +28,22 @@ def run_semgrep(files: list[str]) -> list[Violation]:
             )
         ]
 
-    violations = []
+    try:
+        base_cmd = split_command(tool_command, field_name="tools.semgrep")
+    except ConfigValidationError as exc:
+        return [
+            Violation(
+                file=".guardian/config.yaml",
+                line=0,
+                column=0,
+                rule="semgrep-command-invalid",
+                message=str(exc),
+                severity="error",
+                suggestion="Fix tools.semgrep in .guardian/config.yaml.",
+            )
+        ]
 
-    # Run Semgrep
-    cmd = [
-        "semgrep",
-        "--config",
-        str(rules_file),
-        "--json",
-        *files,
-    ]
+    cmd = [*base_cmd, "--config", str(rules_file), "--json", *files]
 
     try:
         result = subprocess.run(
@@ -52,13 +61,29 @@ def run_semgrep(files: list[str]) -> list[Violation]:
                 rule="semgrep-execution",
                 message=f"Failed to execute Semgrep: {exc}",
                 severity="error",
-                suggestion="Ensure `semgrep` is installed and available in PATH.",
+                suggestion="Ensure Semgrep is installed and available to Guardian.",
             )
         ]
 
-    # Semgrep returns non-zero on matches, but we still parse output
     try:
         data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        stderr_preview = result.stderr.strip().splitlines()
+        detail = stderr_preview[0] if stderr_preview else "No stderr output available."
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="semgrep-output-parse",
+                message=f"Failed to parse Semgrep output: {exc}. {detail}",
+                severity="error",
+                suggestion="Fix Semgrep runtime/configuration issues and retry.",
+            )
+        ]
+
+    violations: list[Violation] = []
+    try:
         for item in data.get("results", []):
             violations.append(
                 Violation(
@@ -70,16 +95,16 @@ def run_semgrep(files: list[str]) -> list[Violation]:
                     severity=item["extra"]["severity"].lower(),
                 )
             )
-    except (json.JSONDecodeError, KeyError) as exc:
+    except (AttributeError, KeyError, TypeError) as exc:
         return [
             Violation(
                 file=".",
                 line=0,
                 column=0,
                 rule="semgrep-output-parse",
-                message=f"Failed to parse Semgrep output: {exc}",
+                message=f"Unexpected Semgrep output structure: {exc}",
                 severity="error",
-                suggestion="Fix Semgrep configuration or runtime errors and retry.",
+                suggestion="Fix Semgrep runtime/configuration issues and retry.",
             )
         ]
 

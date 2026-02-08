@@ -43,7 +43,7 @@ rules:
 
   # Test skips (both languages)
   - id: pytest-skip-decorator
-    pattern: '@pytest.mark.skip(...)'
+    pattern: "@pytest.mark.skip(...)"
     message: "Skipped pytest test"
     severity: ERROR
     languages: [python]
@@ -54,8 +54,44 @@ rules:
     severity: ERROR
     languages: [python]
 
+  - id: pytest-skipif-decorator
+    pattern: "@pytest.mark.skipif(...)"
+    message: "Conditionally skipped pytest test"
+    severity: ERROR
+    languages: [python]
+
+  - id: pytest-importorskip
+    pattern: pytest.importorskip(...)
+    message: "Dynamic pytest import skip"
+    severity: ERROR
+    languages: [python]
+
   - id: unittest-skip
-    pattern: '@unittest.skip(...)'
+    pattern: "@unittest.skip(...)"
     message: "Skipped unittest"
     severity: ERROR
     languages: [python]
+
+  - id: unittest-skip-if
+    pattern: "@unittest.skipIf(...)"
+    message: "Conditionally skipped unittest"
+    severity: ERROR
+    languages: [python]
+
+  - id: unittest-skip-unless
+    pattern: "@unittest.skipUnless(...)"
+    message: "Conditionally skipped unittest"
+    severity: ERROR
+    languages: [python]
+
+  - id: js-focused-or-skipped-tests
+    pattern-regex: '\b(describe|context|it|test)\.(only|skip)\s*\('
+    message: "Focused or skipped JavaScript/TypeScript test detected"
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: js-placeholder-comment
+    pattern-regex: '(?im)^(\\s*)(//|/\\*)\\s*(TODO|FIXME|HACK|XXX)\\b'
+    message: "Placeholder comment detected in JavaScript/TypeScript"
+    severity: WARNING
+    languages: [javascript, typescript]

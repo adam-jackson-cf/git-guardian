@@ -1,0 +1,8 @@
+{
+  "description": "Invalid Guardian config must fail with guardian-config-invalid.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["guardian-config-invalid"]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Missing coverage artifact must fail closed.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["coverage-artifact-missing"]
+  },
+  "repo": {
+    "include_coverage_file": false
+  }
+}

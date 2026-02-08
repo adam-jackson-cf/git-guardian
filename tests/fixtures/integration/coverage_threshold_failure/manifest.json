@@ -1,0 +1,12 @@
+{
+  "description": "Coverage below threshold should fail verification.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["coverage-delta"]
+  },
+  "tool_env": {
+    "DIFF_COVER_REPORT": "{\"total_percent_covered\": 62}",
+    "DIFF_COVER_EXIT": "1"
+  }
+}

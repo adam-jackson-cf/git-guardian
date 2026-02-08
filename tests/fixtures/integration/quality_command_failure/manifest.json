@@ -1,0 +1,11 @@
+{
+  "description": "Repository quality command failure must block verification.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["quality-command-failed"]
+  },
+  "tool_env": {
+    "QUALITY_GATE_EXIT": "2"
+  }
+}

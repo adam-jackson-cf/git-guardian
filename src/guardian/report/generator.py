@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from guardian.analysis.violation import Violation
+from guardian.configuration import ConfigValidationError, load_guardian_config
 
 
 def generate_report(violations: list[Violation]) -> Path:
@@ -29,8 +30,8 @@ def generate_report(violations: list[Violation]) -> Path:
 
 | Check | Status | Count |
 |-------|--------|-------|
-| Errors | {'❌ Fail' if errors else '✅ Pass'} | {len(errors)} |
-| Warnings | {'⚠️ Warn' if warnings else '✅ Pass'} | {len(warnings)} |
+| Errors | {"❌ Fail" if errors else "✅ Pass"} | {len(errors)} |
+| Warnings | {"⚠️ Warn" if warnings else "✅ Pass"} | {len(warnings)} |
 | **Total** | | **{len(violations)}** |
 
 ## Violations
@@ -76,15 +77,13 @@ def generate_report(violations: list[Violation]) -> Path:
 
 def _cleanup_old_reports(report_dir: Path) -> None:
     """Remove old reports, keeping only the most recent ones."""
-    # Get config for keep_count
-    config_file = Path.cwd() / ".guardian" / "config.yaml"
     keep_count = 10
 
-    if config_file.exists():
-        import yaml
-
-        config = yaml.safe_load(config_file.read_text())
-        keep_count = config.get("reports", {}).get("keep_count", 10)
+    try:
+        config = load_guardian_config(Path.cwd())
+        keep_count = config.reports.keep_count
+    except ConfigValidationError:
+        keep_count = 10
 
     # Get all report files sorted by modification time
     reports = sorted(

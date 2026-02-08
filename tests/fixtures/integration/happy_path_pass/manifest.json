@@ -1,0 +1,8 @@
+{
+  "description": "Healthy repository and tool outputs should pass verification.",
+  "expected": {
+    "status": "passed",
+    "exit_code": 0,
+    "forbidden_rules": ["guardian-config-invalid"]
+  }
+}

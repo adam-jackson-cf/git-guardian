@@ -1,82 +1,201 @@
 """Coverage analysis using diff-cover."""
 
+from __future__ import annotations
+
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 from guardian.analysis.violation import Violation
+from guardian.configuration import ConfigValidationError, split_command
 
 
-def run_diff_cover(coverage_file: Path) -> list[Violation]:
-    """Run diff-cover for coverage analysis."""
+def run_diff_cover(
+    coverage_file: Path,
+    *,
+    compare_branch: str,
+    threshold: int,
+    tool_command: str,
+) -> list[Violation]:
+    """Run diff-cover for coverage analysis in fail-closed mode."""
     repo_root = Path.cwd()
 
-    # Get config
-    config_file = repo_root / ".guardian" / "config.yaml"
-    compare_branch = "origin/main"
-    threshold = 80
+    if not coverage_file.exists():
+        return [
+            Violation(
+                file=str(coverage_file),
+                line=0,
+                column=0,
+                rule="coverage-artifact-missing",
+                message=(
+                    f"Coverage artifact is missing at {coverage_file}. "
+                    "Guardian requires coverage data before push."
+                ),
+                severity="error",
+                suggestion="Generate fresh coverage (for example: pytest --cov --cov-report=xml).",
+            )
+        ]
 
-    if config_file.exists():
-        import yaml
-
-        config = yaml.safe_load(config_file.read_text())
-        compare_branch = config.get("analysis", {}).get("compare_branch", "origin/main")
-        threshold = config.get("analysis", {}).get("coverage_threshold", 80)
-
-    violations = []
-
-    # Run diff-cover
-    # Note: diff-cover doesn't support --json-report to stdout on all platforms
-    # We'll use a temp file approach
-    import tempfile
+    try:
+        base_cmd = split_command(tool_command, field_name="tools.diff_cover")
+    except ConfigValidationError as exc:
+        return [
+            Violation(
+                file=".guardian/config.yaml",
+                line=0,
+                column=0,
+                rule="diff-cover-command-invalid",
+                message=str(exc),
+                severity="error",
+                suggestion="Fix tools.diff_cover in .guardian/config.yaml.",
+            )
+        ]
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
+        report_path = Path(tmp.name)
 
     try:
         cmd = [
-            "diff-cover",
+            *base_cmd,
             str(coverage_file),
             "--compare-branch",
             compare_branch,
             "--json-report",
-            str(tmp_path),
+            str(report_path),
             "--fail-under",
             str(threshold),
         ]
 
-        subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=repo_root,
+            )
+        except OSError as exc:
+            return [
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-execution",
+                    message=f"Failed to execute diff-cover: {exc}",
+                    severity="error",
+                    suggestion="Ensure diff-cover is installed and available to Guardian.",
+                )
+            ]
 
-        # Check if report was generated
-        if tmp_path.exists():
-            try:
-                data = json.loads(tmp_path.read_text())
-                coverage = data.get("total_percent_covered", 0)
+        if not report_path.exists():
+            stderr_preview = result.stderr.strip().splitlines()
+            detail = stderr_preview[0] if stderr_preview else "No stderr output available."
+            return [
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-report-missing",
+                    message=f"diff-cover did not produce JSON output. {detail}",
+                    severity="error",
+                    suggestion="Fix diff-cover invocation and ensure coverage report is valid.",
+                )
+            ]
 
-                if coverage < threshold:
-                    violations.append(
-                        Violation(
-                            file="coverage",
-                            line=0,
-                            column=0,
-                            rule="coverage-delta",
-                            message=(
-                                f"Coverage on changed lines is {coverage:.1f}%, "
-                                f"below threshold of {threshold}%"
-                            ),
-                            severity="error",
-                        )
+        try:
+            report_text = report_path.read_text()
+            if not report_text.strip():
+                return [
+                    Violation(
+                        file=str(coverage_file),
+                        line=0,
+                        column=0,
+                        rule="diff-cover-report-missing",
+                        message="diff-cover JSON output file is empty.",
+                        severity="error",
+                        suggestion="Fix diff-cover invocation and ensure coverage report is valid.",
                     )
-            except (json.JSONDecodeError, KeyError):
-                pass
-    finally:
-        # Clean up temp file
-        if tmp_path.exists():
-            tmp_path.unlink()
+                ]
+            report_data = json.loads(report_text)
+        except (json.JSONDecodeError, OSError) as exc:
+            return [
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-output-parse",
+                    message=f"Failed to parse diff-cover JSON output: {exc}",
+                    severity="error",
+                    suggestion=(
+                        "Ensure diff-cover can read the coverage artifact and compare branch."
+                    ),
+                )
+            ]
 
-    return violations
+        coverage_value = report_data.get("total_percent_covered")
+        if not isinstance(coverage_value, (int, float)):
+            return [
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-output-invalid",
+                    message="diff-cover JSON output is missing total_percent_covered.",
+                    severity="error",
+                    suggestion="Use a valid coverage.xml and rerun verification.",
+                )
+            ]
+
+        violations: list[Violation] = []
+
+        if coverage_value < threshold:
+            violations.append(
+                Violation(
+                    file="coverage",
+                    line=0,
+                    column=0,
+                    rule="coverage-delta",
+                    message=(
+                        f"Coverage on changed lines is {coverage_value:.1f}%, "
+                        f"below threshold of {threshold}%"
+                    ),
+                    severity="error",
+                )
+            )
+
+        if result.returncode not in (0, 1):
+            stderr_preview = result.stderr.strip().splitlines()
+            detail = stderr_preview[0] if stderr_preview else "No stderr output available."
+            violations.append(
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-execution",
+                    message=(f"diff-cover failed with exit code {result.returncode}. {detail}"),
+                    severity="error",
+                    suggestion="Fix diff-cover runtime errors before pushing.",
+                )
+            )
+
+        if result.returncode == 1 and coverage_value >= threshold:
+            violations.append(
+                Violation(
+                    file=str(coverage_file),
+                    line=0,
+                    column=0,
+                    rule="diff-cover-execution",
+                    message=(
+                        "diff-cover returned a failure code without an actual "
+                        "coverage threshold violation."
+                    ),
+                    severity="error",
+                    suggestion="Review diff-cover diagnostics and compare-branch configuration.",
+                )
+            )
+
+        return violations
+
+    finally:
+        if report_path.exists():
+            report_path.unlink()

@@ -1,13 +1,16 @@
 """Ruff runner for Python analysis."""
 
+from __future__ import annotations
+
 import json
 import subprocess
 from pathlib import Path
 
 from guardian.analysis.violation import Violation
+from guardian.configuration import ConfigValidationError, split_command
 
 
-def run_ruff(files: list[str]) -> list[Violation]:
+def run_ruff(files: list[str], *, tool_command: str) -> list[Violation]:
     """Run Ruff with Guardian config."""
     repo_root = Path.cwd()
     config_file = repo_root / ".guardian" / "ruff.toml"
@@ -25,11 +28,23 @@ def run_ruff(files: list[str]) -> list[Violation]:
             )
         ]
 
-    violations = []
+    try:
+        base_cmd = split_command(tool_command, field_name="tools.ruff")
+    except ConfigValidationError as exc:
+        return [
+            Violation(
+                file=".guardian/config.yaml",
+                line=0,
+                column=0,
+                rule="ruff-command-invalid",
+                message=str(exc),
+                severity="error",
+                suggestion="Fix tools.ruff in .guardian/config.yaml.",
+            )
+        ]
 
-    # Run Ruff with --ignore-noqa to show violations despite # noqa
     cmd = [
-        "ruff",
+        *base_cmd,
         "check",
         "--config",
         str(config_file),
@@ -55,13 +70,29 @@ def run_ruff(files: list[str]) -> list[Violation]:
                 rule="ruff-execution",
                 message=f"Failed to execute Ruff: {exc}",
                 severity="error",
-                suggestion="Ensure `ruff` is installed and available in PATH.",
+                suggestion="Ensure Ruff is installed and available to Guardian.",
             )
         ]
 
-    # Ruff returns non-zero on errors, but we still parse output
     try:
         data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        stderr_preview = result.stderr.strip().splitlines()
+        detail = stderr_preview[0] if stderr_preview else "No stderr output available."
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="ruff-output-parse",
+                message=f"Failed to parse Ruff output: {exc}. {detail}",
+                severity="error",
+                suggestion="Fix Ruff runtime/configuration issues and retry.",
+            )
+        ]
+
+    violations: list[Violation] = []
+    try:
         for item in data:
             violations.append(
                 Violation(
@@ -73,16 +104,16 @@ def run_ruff(files: list[str]) -> list[Violation]:
                     severity="error",
                 )
             )
-    except (json.JSONDecodeError, KeyError) as exc:
+    except (AttributeError, KeyError, TypeError) as exc:
         return [
             Violation(
                 file=".",
                 line=0,
                 column=0,
                 rule="ruff-output-parse",
-                message=f"Failed to parse Ruff output: {exc}",
+                message=f"Unexpected Ruff output structure: {exc}",
                 severity="error",
-                suggestion="Fix Ruff configuration or runtime errors and retry.",
+                suggestion="Fix Ruff runtime/configuration issues and retry.",
             )
         ]
 

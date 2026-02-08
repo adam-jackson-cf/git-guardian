@@ -1,13 +1,16 @@
 """ESLint runner for TypeScript/JavaScript analysis."""
 
+from __future__ import annotations
+
 import json
 import subprocess
 from pathlib import Path
 
 from guardian.analysis.violation import Violation
+from guardian.configuration import ConfigValidationError, split_command
 
 
-def run_eslint(files: list[str]) -> list[Violation]:
+def run_eslint(files: list[str], *, tool_command: str) -> list[Violation]:
     """Run ESLint with Guardian config."""
     repo_root = Path.cwd()
     config_file = repo_root / ".guardian" / "eslint.config.js"
@@ -25,18 +28,22 @@ def run_eslint(files: list[str]) -> list[Violation]:
             )
         ]
 
-    violations = []
+    try:
+        base_cmd = split_command(tool_command, field_name="tools.eslint")
+    except ConfigValidationError as exc:
+        return [
+            Violation(
+                file=".guardian/config.yaml",
+                line=0,
+                column=0,
+                rule="eslint-command-invalid",
+                message=str(exc),
+                severity="error",
+                suggestion="Fix tools.eslint in .guardian/config.yaml.",
+            )
+        ]
 
-    # Run ESLint
-    cmd = [
-        "npx",
-        "eslint",
-        "--config",
-        str(config_file),
-        "--format",
-        "json",
-        *files,
-    ]
+    cmd = [*base_cmd, "--config", str(config_file), "--format", "json", *files]
 
     try:
         result = subprocess.run(
@@ -54,13 +61,29 @@ def run_eslint(files: list[str]) -> list[Violation]:
                 rule="eslint-execution",
                 message=f"Failed to execute ESLint: {exc}",
                 severity="error",
-                suggestion="Ensure `npx eslint` is installed and available in PATH.",
+                suggestion="Ensure ESLint is installed and available to Guardian.",
             )
         ]
 
-    # ESLint returns non-zero on errors, but we still parse output
     try:
         data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        stderr_preview = result.stderr.strip().splitlines()
+        detail = stderr_preview[0] if stderr_preview else "No stderr output available."
+        return [
+            Violation(
+                file=".",
+                line=0,
+                column=0,
+                rule="eslint-output-parse",
+                message=f"Failed to parse ESLint output: {exc}. {detail}",
+                severity="error",
+                suggestion="Fix ESLint runtime/configuration issues and retry.",
+            )
+        ]
+
+    violations: list[Violation] = []
+    try:
         for file_result in data:
             for msg in file_result.get("messages", []):
                 violations.append(
@@ -73,16 +96,16 @@ def run_eslint(files: list[str]) -> list[Violation]:
                         severity="error" if msg.get("severity") == 2 else "warning",
                     )
                 )
-    except (json.JSONDecodeError, KeyError) as exc:
+    except (AttributeError, KeyError, TypeError) as exc:
         return [
             Violation(
                 file=".",
                 line=0,
                 column=0,
                 rule="eslint-output-parse",
-                message=f"Failed to parse ESLint output: {exc}",
+                message=f"Unexpected ESLint output structure: {exc}",
                 severity="error",
-                suggestion="Fix ESLint configuration or runtime errors and retry.",
+                suggestion="Fix ESLint runtime/configuration issues and retry.",
             )
         ]
 

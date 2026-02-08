@@ -1,0 +1,11 @@
+{
+  "description": "Corrupt analyzer JSON output must fail closed.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["ruff-output-parse"]
+  },
+  "tool_env": {
+    "RUFF_STDOUT": "not-json"
+  }
+}

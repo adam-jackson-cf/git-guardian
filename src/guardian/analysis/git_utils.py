@@ -13,19 +13,9 @@ class FileDiscoveryResult:
     error: str | None = None
 
 
-def get_changed_files() -> FileDiscoveryResult:
-    """Get files changed since origin/main."""
+def get_changed_files(compare_branch: str) -> FileDiscoveryResult:
+    """Get files changed since the configured compare branch."""
     repo_root = Path.cwd()
-
-    # Try to get compare branch from config
-    config_file = repo_root / ".guardian" / "config.yaml"
-    compare_branch = "origin/main"
-
-    if config_file.exists():
-        import yaml
-
-        config = yaml.safe_load(config_file.read_text())
-        compare_branch = config.get("analysis", {}).get("compare_branch", "origin/main")
 
     try:
         result = subprocess.run(

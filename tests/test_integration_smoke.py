@@ -1,5 +1,6 @@
 """Integration smoke tests for end-to-end Guardian CLI verification behavior."""
 
+import hashlib
 import json
 import os
 import stat
@@ -32,12 +33,56 @@ def _setup_repo(temp_dir: Path, compare_branch: str) -> Path:
     guardian_dir = repo / ".guardian"
     guardian_dir.mkdir()
     (guardian_dir / "config.yaml").write_text(
-        f"analysis:\n  compare_branch: {compare_branch}\n  coverage_threshold: 80\n"
+        "\n".join(
+            [
+                'version: "0.3"',
+                "analysis:",
+                "  languages:",
+                "    - typescript",
+                "    - python",
+                f"  compare_branch: {compare_branch}",
+                "  coverage_threshold: 80",
+                "  coverage_file: coverage.xml",
+                "tools:",
+                "  eslint: npx --no-install eslint",
+                "  ruff: ruff",
+                "  semgrep: semgrep",
+                "  diff_cover: diff-cover",
+                "quality:",
+                "  commands:",
+                "    - git status --short",
+                "reports:",
+                "  format: markdown",
+                "  keep_count: 10",
+                "\n",
+            ]
+        )
     )
     (guardian_dir / "ruff.toml").write_text("line-length = 100\n")
     (guardian_dir / "semgrep-rules.yaml").write_text("rules: []\n")
     (guardian_dir / "eslint.config.js").write_text("export default [];\n")
-    (guardian_dir / "baseline.json").write_text("{}\n")
+    baseline_data: dict[str, str] = {}
+    for relative_path in (
+        ".guardian/config.yaml",
+        ".guardian/ruff.toml",
+        ".guardian/semgrep-rules.yaml",
+        ".guardian/eslint.config.js",
+    ):
+        file_path = repo / relative_path
+        baseline_data[relative_path] = hashlib.sha256(file_path.read_bytes()).hexdigest()
+    (guardian_dir / "baseline.json").write_text(json.dumps(baseline_data, indent=2) + "\n")
+    (guardian_dir / "baseline.meta.json").write_text(
+        json.dumps(
+            {
+                "acknowledged_policy_change": True,
+                "reason": "Initial integration baseline",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    (repo / "coverage.xml").write_text("<coverage line-rate='1.0'></coverage>\n")
 
     app_file = repo / "app.py"
     app_file.write_text("print('base')\n")
@@ -66,6 +111,24 @@ def _setup_fake_tools(repo: Path, ruff_json: str) -> dict[str, str]:
     _write_executable(
         bin_dir / "npx",
         "#!/usr/bin/env bash\necho '[]'\nexit 0\n",
+    )
+    _write_executable(
+        bin_dir / "diff-cover",
+        (
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "report=''\n"
+            "while (($# > 0)); do\n"
+            '  if [[ "$1" == "--json-report" ]]; then\n'
+            '    report="$2"\n'
+            "    shift 2\n"
+            "    continue\n"
+            "  fi\n"
+            "  shift\n"
+            "done\n"
+            'echo \'{"total_percent_covered": 100}\' > "$report"\n'
+            "exit 0\n"
+        ),
     )
 
     env = os.environ.copy()

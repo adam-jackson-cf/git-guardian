@@ -1,0 +1,11 @@
+{
+  "description": "Missing compare branch should produce git-compare-branch violation.",
+  "expected": {
+    "status": "failed",
+    "exit_code": 1,
+    "rules": ["git-compare-branch"]
+  },
+  "repo": {
+    "compare_branch": "origin/missing"
+  }
+}
