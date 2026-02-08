@@ -51,6 +51,9 @@ bash install.sh
 # From the repository root, install using uv
 uv sync
 uv pip install -e .
+
+# Install git pre-commit gate
+pre-commit install
 ```
 
 ## Quick Start
