@@ -1,0 +1,28 @@
+name: CI Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run central quality gate runner (check-only)
+        run: bash scripts/run-ci-quality-gates.sh
