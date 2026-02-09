@@ -36,12 +36,28 @@ assert_parity() {
     exit 1
   fi
 
-  if ! rg -q "entry:[[:space:]]+bash[[:space:]]+$RUNNER_PATH[[:space:]]+--fix[[:space:]]+--stage" "$PRECOMMIT_CONFIG"; then
+  local precommit_pattern="entry:[[:space:]]+bash[[:space:]]+$RUNNER_PATH[[:space:]]+--fix[[:space:]]+--stage"
+  local workflow_pattern="bash[[:space:]]+$RUNNER_PATH"
+
+  if command -v rg >/dev/null 2>&1; then
+    if ! rg -q "$precommit_pattern" "$PRECOMMIT_CONFIG"; then
+      echo "Parity check failed: $PRECOMMIT_CONFIG does not reference $RUNNER_PATH with --fix --stage" >&2
+      exit 1
+    fi
+
+    if ! rg -q "$workflow_pattern" "$CI_WORKFLOW"; then
+      echo "Parity check failed: $CI_WORKFLOW does not reference $RUNNER_PATH" >&2
+      exit 1
+    fi
+    return
+  fi
+
+  if ! grep -Eq "$precommit_pattern" "$PRECOMMIT_CONFIG"; then
     echo "Parity check failed: $PRECOMMIT_CONFIG does not reference $RUNNER_PATH with --fix --stage" >&2
     exit 1
   fi
 
-  if ! rg -q "bash[[:space:]]+$RUNNER_PATH" "$CI_WORKFLOW"; then
+  if ! grep -Eq "$workflow_pattern" "$CI_WORKFLOW"; then
     echo "Parity check failed: $CI_WORKFLOW does not reference $RUNNER_PATH" >&2
     exit 1
   fi
