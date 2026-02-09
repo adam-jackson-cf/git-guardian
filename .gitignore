@@ -35,6 +35,8 @@ ENV/
 
 # Guardian (project-specific, created by `guardian init`)
 .guardian/
+!tests/fixtures/integration/**/.guardian/
+!tests/fixtures/integration/**/.guardian/**
 
 # Testing
 .pytest_cache/
