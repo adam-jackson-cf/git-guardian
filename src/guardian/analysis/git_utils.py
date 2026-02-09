@@ -1,8 +1,9 @@
 """Git utilities for file detection."""
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+from guardian.analysis.tool_runner import run_command
 
 
 @dataclass
@@ -17,17 +18,19 @@ def get_changed_files(compare_branch: str) -> FileDiscoveryResult:
     """Get files changed since the configured compare branch."""
     repo_root = Path.cwd()
 
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--verify", compare_branch],
-            capture_output=True,
-            text=True,
-        )
-    except OSError as exc:
+    result, execution_violation = run_command(
+        ["git", "rev-parse", "--verify", compare_branch],
+        cwd=repo_root,
+        execution_rule="git-compare-branch-execution",
+        execution_prefix=f"Failed to verify compare branch '{compare_branch}'",
+        execution_suggestion="Ensure git is installed and compare_branch is valid.",
+    )
+    if execution_violation is not None:
         return FileDiscoveryResult(
             files=[],
-            error=f"Failed to verify compare branch '{compare_branch}': {exc}",
+            error=execution_violation.message,
         )
+    assert result is not None
 
     if result.returncode != 0:
         return FileDiscoveryResult(
@@ -38,17 +41,19 @@ def get_changed_files(compare_branch: str) -> FileDiscoveryResult:
             ),
         )
 
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", f"{compare_branch}...HEAD"],
-            capture_output=True,
-            text=True,
-        )
-    except OSError as exc:
+    result, execution_violation = run_command(
+        ["git", "diff", "--name-only", f"{compare_branch}...HEAD"],
+        cwd=repo_root,
+        execution_rule="git-diff-execution",
+        execution_prefix=f"Failed to diff against compare branch '{compare_branch}'",
+        execution_suggestion="Ensure git is installed and repository state is healthy.",
+    )
+    if execution_violation is not None:
         return FileDiscoveryResult(
             files=[],
-            error=f"Failed to diff against compare branch '{compare_branch}': {exc}",
+            error=execution_violation.message,
         )
+    assert result is not None
 
     if result.returncode != 0:
         return FileDiscoveryResult(
@@ -67,14 +72,16 @@ def get_all_files() -> FileDiscoveryResult:
     """Get all tracked files in the repository."""
     repo_root = Path.cwd()
 
-    try:
-        result = subprocess.run(
-            ["git", "ls-files"],
-            capture_output=True,
-            text=True,
-        )
-    except OSError as exc:
-        return FileDiscoveryResult(files=[], error=f"Failed to list repository files: {exc}")
+    result, execution_violation = run_command(
+        ["git", "ls-files"],
+        cwd=repo_root,
+        execution_rule="git-ls-files-execution",
+        execution_prefix="Failed to list repository files",
+        execution_suggestion="Ensure git is installed and run within a repository.",
+    )
+    if execution_violation is not None:
+        return FileDiscoveryResult(files=[], error=execution_violation.message)
+    assert result is not None
 
     if result.returncode != 0:
         return FileDiscoveryResult(files=[], error="git ls-files failed in current repository.")

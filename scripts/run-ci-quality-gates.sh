@@ -73,6 +73,9 @@ run_checks() {
 
   uv run ruff check .
   uv run mypy src/ --ignore-missing-imports
+  uv run python scripts/quality_metrics.py \
+    --budget-file quality/complexity-budget.json \
+    --trend-dir .guardian/reports/quality-trends
   uv run pytest
 }
 

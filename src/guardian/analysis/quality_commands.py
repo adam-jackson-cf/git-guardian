@@ -2,54 +2,45 @@
 
 from __future__ import annotations
 
-import subprocess
+from pathlib import Path
 
+from guardian.analysis.tool_runner import resolve_tool_command, run_command
 from guardian.analysis.violation import Violation
-from guardian.configuration import ConfigValidationError, split_command
 
 
 def run_quality_commands(commands: tuple[str, ...]) -> list[Violation]:
     """Execute deterministic quality commands and report failures as violations."""
     violations: list[Violation] = []
+    repo_root = Path.cwd()
 
     for index, command in enumerate(commands, start=1):
-        try:
-            argv = split_command(command, field_name=f"quality.commands[{index - 1}]")
-        except ConfigValidationError as exc:
+        argv, command_violation = resolve_tool_command(
+            command,
+            field_name=f"quality.commands[{index - 1}]",
+            invalid_rule="quality-command-invalid",
+            invalid_suggestion="Fix `quality.commands` in .guardian/config.yaml and retry.",
+        )
+        if command_violation is not None:
             violations.append(
-                Violation(
-                    file=".guardian/config.yaml",
-                    line=0,
-                    column=0,
-                    rule="quality-command-invalid",
-                    message=str(exc),
-                    severity="error",
-                    suggestion="Fix `quality.commands` in .guardian/config.yaml and retry.",
-                )
+                command_violation
             )
             continue
+        assert argv is not None
 
-        try:
-            result = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-            )
-        except OSError as exc:
+        result, execution_violation = run_command(
+            argv,
+            cwd=repo_root,
+            execution_rule="quality-command-execution",
+            execution_prefix=f"Failed to execute quality command #{index}: {' '.join(argv)}",
+            execution_suggestion="Install required tooling and ensure command paths are valid.",
+            violation_file=".guardian/config.yaml",
+        )
+        if execution_violation is not None:
             violations.append(
-                Violation(
-                    file=".guardian/config.yaml",
-                    line=0,
-                    column=0,
-                    rule="quality-command-execution",
-                    message=(
-                        f"Failed to execute quality command #{index}: {' '.join(argv)} ({exc})"
-                    ),
-                    severity="error",
-                    suggestion="Install required tooling and ensure command paths are valid.",
-                )
+                execution_violation
             )
             continue
+        assert result is not None
 
         if result.returncode != 0:
             violations.append(

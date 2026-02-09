@@ -144,100 +144,126 @@ def _check_baseline_change_policy(changed_files: list[str], repo_root: Path) -> 
     baseline_changed = BASELINE_FILE in changed_files
     baseline_meta_changed = BASELINE_META_FILE in changed_files
 
-    if baseline_meta_changed and not baseline_changed:
-        violations.append(
-            Violation(
-                file=BASELINE_META_FILE,
-                line=0,
-                column=0,
-                rule="baseline-meta-without-baseline",
-                message="Baseline metadata changed without baseline hash updates.",
-                severity="error",
-                suggestion="Update baseline metadata only when baseline hashes are updated.",
-            )
-        )
+    meta_without_baseline = _check_meta_changed_without_baseline(
+        baseline_meta_changed=baseline_meta_changed,
+        baseline_changed=baseline_changed,
+    )
+    if meta_without_baseline is not None:
+        violations.append(meta_without_baseline)
 
     if not baseline_changed:
         return violations
 
-    if not baseline_meta_changed:
-        violations.append(
-            Violation(
-                file=BASELINE_FILE,
-                line=0,
-                column=0,
-                rule="baseline-meta-required",
-                message=(
-                    "Baseline hash updates require matching .guardian/baseline.meta.json changes."
-                ),
-                severity="error",
-                suggestion="Run guardian baseline update with acknowledge and reason flags.",
-            )
-        )
+    metadata_required = _check_metadata_required(baseline_meta_changed=baseline_meta_changed)
+    if metadata_required is not None:
+        violations.append(metadata_required)
 
+    mixed_diff = _check_mixed_policy_diff(changed_files)
+    if mixed_diff is not None:
+        violations.append(mixed_diff)
+
+    metadata, metadata_violation = _load_baseline_metadata(repo_root / BASELINE_META_FILE)
+    if metadata_violation is not None:
+        violations.append(metadata_violation)
+        return violations
+    assert metadata is not None
+
+    violations.extend(_validate_baseline_metadata_fields(metadata))
+    return violations
+
+
+def _check_meta_changed_without_baseline(
+    *,
+    baseline_meta_changed: bool,
+    baseline_changed: bool,
+) -> Violation | None:
+    if not baseline_meta_changed or baseline_changed:
+        return None
+    return Violation(
+        file=BASELINE_META_FILE,
+        line=0,
+        column=0,
+        rule="baseline-meta-without-baseline",
+        message="Baseline metadata changed without baseline hash updates.",
+        severity="error",
+        suggestion="Update baseline metadata only when baseline hashes are updated.",
+    )
+
+
+def _check_metadata_required(*, baseline_meta_changed: bool) -> Violation | None:
+    if baseline_meta_changed:
+        return None
+    return Violation(
+        file=BASELINE_FILE,
+        line=0,
+        column=0,
+        rule="baseline-meta-required",
+        message="Baseline hash updates require matching .guardian/baseline.meta.json changes.",
+        severity="error",
+        suggestion="Run guardian baseline update with acknowledge and reason flags.",
+    )
+
+
+def _check_mixed_policy_diff(changed_files: list[str]) -> Violation | None:
     non_policy_changes = [
         file_path for file_path in changed_files if file_path not in POLICY_CHANGE_FILES
     ]
-    if non_policy_changes:
-        violations.append(
-            Violation(
-                file=BASELINE_FILE,
-                line=0,
-                column=0,
-                rule="baseline-change-mixed-diff",
-                message=(
-                    "Baseline updates must be policy-only. "
-                    f"Found non-policy changes: {', '.join(non_policy_changes[:5])}"
-                ),
-                severity="error",
-                suggestion="Split baseline/policy updates from application code changes.",
-            )
-        )
+    if not non_policy_changes:
+        return None
+    return Violation(
+        file=BASELINE_FILE,
+        line=0,
+        column=0,
+        rule="baseline-change-mixed-diff",
+        message=(
+            "Baseline updates must be policy-only. "
+            f"Found non-policy changes: {', '.join(non_policy_changes[:5])}"
+        ),
+        severity="error",
+        suggestion="Split baseline/policy updates from application code changes.",
+    )
 
-    metadata_path = repo_root / BASELINE_META_FILE
+
+def _load_baseline_metadata(
+    metadata_path: Path,
+) -> tuple[dict[str, object], None] | tuple[None, Violation]:
     if not metadata_path.exists():
-        violations.append(
-            Violation(
-                file=BASELINE_META_FILE,
-                line=0,
-                column=0,
-                rule="baseline-meta-missing",
-                message="Baseline metadata file is missing.",
-                severity="error",
-                suggestion="Regenerate baseline via guardian baseline update.",
-            )
+        return None, Violation(
+            file=BASELINE_META_FILE,
+            line=0,
+            column=0,
+            rule="baseline-meta-missing",
+            message="Baseline metadata file is missing.",
+            severity="error",
+            suggestion="Regenerate baseline via guardian baseline update.",
         )
-        return violations
-
     try:
         metadata = json.loads(metadata_path.read_text())
     except (json.JSONDecodeError, OSError):
-        violations.append(
-            Violation(
-                file=BASELINE_META_FILE,
-                line=0,
-                column=0,
-                rule="baseline-meta-invalid",
-                message="Baseline metadata file is invalid JSON.",
-                severity="error",
-                suggestion="Regenerate baseline via guardian baseline update.",
-            )
+        return None, Violation(
+            file=BASELINE_META_FILE,
+            line=0,
+            column=0,
+            rule="baseline-meta-invalid",
+            message="Baseline metadata file is invalid JSON.",
+            severity="error",
+            suggestion="Regenerate baseline via guardian baseline update.",
         )
-        return violations
-
     if not isinstance(metadata, dict):
-        violations.append(
-            Violation(
-                file=BASELINE_META_FILE,
-                line=0,
-                column=0,
-                rule="baseline-meta-invalid",
-                message="Baseline metadata must be a JSON object.",
-                severity="error",
-                suggestion="Regenerate baseline via guardian baseline update.",
-            )
+        return None, Violation(
+            file=BASELINE_META_FILE,
+            line=0,
+            column=0,
+            rule="baseline-meta-invalid",
+            message="Baseline metadata must be a JSON object.",
+            severity="error",
+            suggestion="Regenerate baseline via guardian baseline update.",
         )
-        return violations
+    return metadata, None
+
+
+def _validate_baseline_metadata_fields(metadata: dict[str, object]) -> list[Violation]:
+    violations: list[Violation] = []
 
     if metadata.get("acknowledged_policy_change") is not True:
         violations.append(

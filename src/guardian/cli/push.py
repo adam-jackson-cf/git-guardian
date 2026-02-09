@@ -1,12 +1,13 @@
 """Push command with verification."""
 
-import subprocess
 import sys
+from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from guardian.analysis.pipeline import run_verification
+from guardian.analysis.tool_runner import run_command
 from guardian.report.generator import generate_report
 
 app = typer.Typer(name="push", help="Verify code quality and push to remote")
@@ -23,11 +24,17 @@ def push(
 
     # Get current branch if not specified
     if branch is None:
-        result = subprocess.run(
+        result, execution_violation = run_command(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
+            cwd=Path.cwd(),
+            execution_rule="git-current-branch-execution",
+            execution_prefix="Failed to determine current branch",
+            execution_suggestion="Ensure git is installed and run inside a repository.",
         )
+        if execution_violation is not None:
+            console.print(f"[red]Error: {execution_violation.message}[/red]")
+            raise typer.Exit(1)
+        assert result is not None
         if result.returncode != 0:
             console.print("[red]Error: Could not determine current branch[/red]")
             raise typer.Exit(1)
@@ -60,9 +67,19 @@ def push(
 
     console.print(f"\n[blue]Pushing to {remote}/{branch}...[/blue]")
 
-    result = subprocess.run(push_cmd)
+    push_result, push_execution_violation = run_command(
+        push_cmd,
+        cwd=Path.cwd(),
+        execution_rule="git-push-execution",
+        execution_prefix="Failed to execute git push",
+        execution_suggestion="Ensure git is installed and remote is reachable.",
+    )
+    if push_execution_violation is not None:
+        console.print(f"[red]❌ {push_execution_violation.message}[/red]")
+        sys.exit(2)
+    assert push_result is not None
 
-    if result.returncode != 0:
+    if push_result.returncode != 0:
         console.print("[red]❌ Git push failed[/red]")
         sys.exit(2)
 

@@ -1,7 +1,6 @@
 """Initialize Guardian in a repository."""
 
 import json
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -9,35 +8,12 @@ import typer
 from rich.console import Console
 
 from guardian.analysis.config_drift import BASELINE_META_FILE
+from guardian.analysis.tool_runner import run_command
 
 app = typer.Typer(name="init", help="Initialize Guardian in a repository")
 console = Console()
 
-
-def _initialize_guardian() -> None:
-    """Initialize Guardian configuration in the current repository."""
-    repo_root = Path.cwd()
-
-    # Check if we're in a git repository
-    try:
-        subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            capture_output=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError:
-        console.print("[red]Error: Not in a git repository[/red]")
-        raise typer.Exit(1) from None
-
-    guardian_dir = repo_root / ".guardian"
-    guardian_dir.mkdir(exist_ok=True)
-    reports_dir = guardian_dir / "reports"
-    reports_dir.mkdir(exist_ok=True)
-
-    # Create default config if it doesn't exist
-    config_file = guardian_dir / "config.yaml"
-    if not config_file.exists():
-        config_file.write_text("""# Guardian Configuration
+DEFAULT_CONFIG_YAML = """# Guardian Configuration
 
 version: "0.3"
 
@@ -78,7 +54,38 @@ reports:
 harness:
   # Which tools are in use
   enabled: []
-""")
+"""
+
+
+def _initialize_guardian() -> None:
+    """Initialize Guardian configuration in the current repository."""
+    repo_root = Path.cwd()
+
+    # Check if we're in a git repository
+    result, execution_violation = run_command(
+        ["git", "rev-parse", "--git-dir"],
+        cwd=repo_root,
+        execution_rule="git-rev-parse-execution",
+        execution_prefix="Failed to determine git repository",
+        execution_suggestion="Ensure git is installed and run inside a repository.",
+    )
+    if execution_violation is not None:
+        console.print(f"[red]Error: {execution_violation.message}[/red]")
+        raise typer.Exit(1) from None
+    assert result is not None
+    if result.returncode != 0:
+        console.print("[red]Error: Not in a git repository[/red]")
+        raise typer.Exit(1) from None
+
+    guardian_dir = repo_root / ".guardian"
+    guardian_dir.mkdir(exist_ok=True)
+    reports_dir = guardian_dir / "reports"
+    reports_dir.mkdir(exist_ok=True)
+
+    # Create default config if it doesn't exist
+    config_file = guardian_dir / "config.yaml"
+    if not config_file.exists():
+        config_file.write_text(DEFAULT_CONFIG_YAML)
         console.print(f"[green]✓ Created {config_file}[/green]")
 
     # Create baseline.json if it doesn't exist
