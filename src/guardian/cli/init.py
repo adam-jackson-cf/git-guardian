@@ -41,9 +41,29 @@ tools:
 # Repository-defined deterministic quality gates
 quality:
   commands:
-    - uv run ruff check .
-    - uv run mypy src/ --ignore-missing-imports
-    - uv run pytest
+    - name: ruff
+      run: uv run ruff check .
+      run_on: changed
+      include:
+        - src/**/*.py
+        - tests/**/*.py
+        - pyproject.toml
+        - uv.lock
+    - name: mypy
+      run: uv run mypy src/ --ignore-missing-imports
+      run_on: full
+      include:
+        - src/**/*.py
+        - pyproject.toml
+        - uv.lock
+    - name: pytest
+      run: uv run pytest
+      run_on: full
+      include:
+        - src/**/*.py
+        - tests/**/*.py
+        - pyproject.toml
+        - uv.lock
 
 # Report settings
 reports:

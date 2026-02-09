@@ -17,6 +17,7 @@ from guardian.configuration.schema import (
     AnalysisConfig,
     GuardianConfig,
     HarnessConfig,
+    QualityCommand,
     QualityConfig,
     ReportConfig,
     ToolConfig,
@@ -28,6 +29,59 @@ from guardian.configuration.validation import (
     read_string,
     read_string_list,
 )
+
+
+def _parse_quality_commands(quality_raw: dict[str, object]) -> tuple[QualityCommand, ...]:
+    """Parse and validate quality.commands entries."""
+    quality_commands_raw = quality_raw.get("commands")
+    if not isinstance(quality_commands_raw, list):
+        raise ConfigValidationError(
+            "Key 'quality.commands' must be a list in .guardian/config.yaml."
+        )
+    if not quality_commands_raw:
+        raise ConfigValidationError("Key 'quality.commands' must contain at least one entry.")
+
+    commands: list[QualityCommand] = []
+    for index, command_raw in enumerate(quality_commands_raw):
+        commands.append(_parse_quality_command(command_raw, index=index))
+    return tuple(commands)
+
+
+def _parse_quality_command(command_raw: object, *, index: int) -> QualityCommand:
+    """Parse one quality.commands item."""
+    if not isinstance(command_raw, dict):
+        raise ConfigValidationError(
+            f"Key 'quality.commands' item at index {index} must be a mapping."
+        )
+
+    command_name = read_string(command_raw, "name", required=True)
+    command_run = read_string(command_raw, "run", required=True)
+    run_on = _parse_quality_run_on(command_raw, index=index)
+    include = tuple(
+        read_string_list(
+            command_raw,
+            "include",
+            required=False,
+            default=[],
+            allow_empty=True,
+        )
+    )
+    return QualityCommand(
+        name=command_name,
+        run=command_run,
+        run_on=run_on,
+        include=include,
+    )
+
+
+def _parse_quality_run_on(command_raw: dict[str, object], *, index: int) -> str:
+    """Validate quality.commands[i].run_on enum."""
+    run_on = read_string(command_raw, "run_on", required=False, default="always")
+    if run_on not in {"always", "changed", "full"}:
+        raise ConfigValidationError(
+            f"Key 'quality.commands[{index}].run_on' must be one of: always, changed, full."
+        )
+    return run_on
 
 
 def load_guardian_config(repo_root: Path) -> GuardianConfig:
@@ -116,12 +170,7 @@ def load_guardian_config(repo_root: Path) -> GuardianConfig:
         ),
     )
 
-    quality_commands = read_string_list(
-        quality_raw,
-        "commands",
-        required=True,
-        allow_empty=False,
-    )
+    quality_commands = _parse_quality_commands(quality_raw)
 
     harness = HarnessConfig(
         enabled=tuple(
@@ -145,6 +194,6 @@ def load_guardian_config(repo_root: Path) -> GuardianConfig:
         ),
         tools=tools,
         reports=reports,
-        quality=QualityConfig(commands=tuple(quality_commands)),
+        quality=QualityConfig(commands=quality_commands),
         harness=harness,
     )

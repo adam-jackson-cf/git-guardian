@@ -43,7 +43,7 @@ def push(
     console.print("[blue]Running Guardian verification...[/blue]")
 
     # Run verification
-    violations = run_verification()
+    violations = run_verification(quality_scope="full")
 
     if violations:
         # Generate report

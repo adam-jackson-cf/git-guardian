@@ -34,10 +34,20 @@ class ReportConfig:
 
 
 @dataclass(frozen=True)
+class QualityCommand:
+    """Single deterministic quality command definition."""
+
+    name: str
+    run: str
+    run_on: str
+    include: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class QualityConfig:
     """Repository-defined deterministic quality gate commands."""
 
-    commands: tuple[str, ...]
+    commands: tuple[QualityCommand, ...]
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
+from typing import Literal
 
 from guardian.analysis.config_drift import check_config_drift
 from guardian.analysis.coverage import run_diff_cover
@@ -15,7 +19,7 @@ from guardian.analysis.violation import Violation
 from guardian.configuration import ConfigValidationError, GuardianConfig, load_guardian_config
 
 
-def run_verification() -> list[Violation]:
+def run_verification(*, quality_scope: Literal["changed", "full"] = "changed") -> list[Violation]:
     """Run all verification tools and aggregate results."""
     config_or_error = _load_config_or_violation()
     if isinstance(config_or_error, list):
@@ -47,7 +51,13 @@ def run_verification() -> list[Violation]:
             tool_command=config.tools.diff_cover,
         )
     )
-    violations.extend(run_quality_commands(config.quality.commands))
+    violations.extend(
+        run_quality_commands(
+            config.quality.commands,
+            changed_files=tuple(changed_files),
+            scope=quality_scope,
+        )
+    )
     violations.extend(check_config_drift(changed_files))
 
     return violations
@@ -85,7 +95,13 @@ def run_full_scan() -> list[Violation]:
             tool_command=config.tools.diff_cover,
         )
     )
-    violations.extend(run_quality_commands(config.quality.commands))
+    violations.extend(
+        run_quality_commands(
+            config.quality.commands,
+            changed_files=tuple(all_file_result.files),
+            scope="full",
+        )
+    )
     violations.extend(check_config_drift([]))
 
     return violations
@@ -93,24 +109,68 @@ def run_full_scan() -> list[Violation]:
 
 def _run_analysis_for_files(files: list[str], config: GuardianConfig) -> list[Violation]:
     """Run language-aware analyzers for a target file set."""
-    violations: list[Violation] = []
-
     ts_enabled = "typescript" in config.analysis.languages
     py_enabled = "python" in config.analysis.languages
 
     ts_files = [f for f in files if f.endswith((".ts", ".tsx", ".js", ".jsx"))]
     py_files = [f for f in files if f.endswith(".py")]
 
+    tool_jobs: list[tuple[str, Callable[[], list[Violation]]]] = []
     if ts_enabled and ts_files:
-        violations.extend(run_eslint(ts_files, tool_command=config.tools.eslint))
+        tool_jobs.append(
+            ("eslint", partial(run_eslint, ts_files, tool_command=config.tools.eslint))
+        )
 
     if py_enabled and py_files:
-        violations.extend(run_ruff(py_files, tool_command=config.tools.ruff))
+        tool_jobs.append(("ruff", partial(run_ruff, py_files, tool_command=config.tools.ruff)))
 
     if files:
-        violations.extend(run_semgrep(files, tool_command=config.tools.semgrep))
+        tool_jobs.append(
+            ("semgrep", partial(run_semgrep, files, tool_command=config.tools.semgrep))
+        )
 
-    return violations
+    if not tool_jobs:
+        return []
+
+    results_by_tool: dict[str, list[Violation]] = {}
+    with ThreadPoolExecutor(max_workers=len(tool_jobs)) as executor:
+        futures: dict[Future[list[Violation]], str] = {
+            executor.submit(job): name for name, job in tool_jobs
+        }
+        for future, name in futures.items():
+            try:
+                results_by_tool[name] = future.result()
+            except Exception as exc:  # pragma: no cover - defensive fail-closed path
+                results_by_tool[name] = [
+                    Violation(
+                        file=".",
+                        line=0,
+                        column=0,
+                        rule=f"{name}-runner-crash",
+                        message=f"{name} runner crashed: {exc}",
+                        severity="error",
+                        suggestion="Fix the tool runner crash and retry Guardian verification.",
+                    )
+                ]
+
+    merged: list[Violation] = []
+    for name, _ in tool_jobs:
+        merged.extend(results_by_tool.get(name, []))
+    return _sort_violations(merged)
+
+
+def _sort_violations(violations: list[Violation]) -> list[Violation]:
+    """Keep violation order deterministic regardless of execution concurrency."""
+    return sorted(
+        violations,
+        key=lambda violation: (
+            violation.file,
+            violation.line,
+            violation.column,
+            violation.rule,
+            violation.message,
+        ),
+    )
 
 
 def _load_config_or_violation() -> GuardianConfig | list[Violation]:
