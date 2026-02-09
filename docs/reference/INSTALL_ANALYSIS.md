@@ -9,7 +9,7 @@ This document analyzes the installation approach used by `ultimate_bug_scanner`,
 ### The Single Curl Command
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh?$(date +%s)" | bash -s --
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/main/install.sh?$(date +%s)" | bash -s --
 ```
 
 ### Key Components Breakdown
@@ -228,7 +228,7 @@ Guardian currently uses:
 #### Option 1: Single-Curl Install Script
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash -s --
+curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/main/install.sh?$(date +%s)" | bash -s --
 ```
 
 **What it would do:**

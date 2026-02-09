@@ -387,10 +387,10 @@ OPTIONS:
 
 EXAMPLES:
     # Interactive installation
-    curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash
+    curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/main/install.sh?$(date +%s)" | bash
 
     # Easy mode (auto-install everything)
-    curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/master/install.sh?$(date +%s)" | bash -s -- --easy-mode
+    curl -fsSL "https://raw.githubusercontent.com/your-org/git-guardian/main/install.sh?$(date +%s)" | bash -s -- --easy-mode
 
     # Dry run to preview changes
     bash install.sh --dry-run
